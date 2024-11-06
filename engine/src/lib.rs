@@ -13,7 +13,6 @@ use winit::{
     window::WindowId,
 };
 
-pub mod renderer;
 pub mod scene;
 pub mod tools;
 pub mod window;
@@ -40,7 +39,11 @@ impl State {
         let target_fps = Duration::from_secs_f32(DEFAULT_FPS);
         let window = Window::new(event_loop);
 
-        let renderer = Renderer::new(&window);
+        #[cfg(not(target_arch = "wasm32"))]
+        let renderer = Renderer::new(window.0.clone(), window.size().into());
+
+        #[cfg(target_arch = "wasm32")]
+        let renderer = Renderer::new(window.0.clone(), (500, 450));
 
         let mut inner = StateInner {
             target_fps,
@@ -73,7 +76,7 @@ impl State {
                 }
                 let size = physical_size.into();
                 self.inner.renderer.resize(size);
-                self.scene.resize(&mut self.inner, size);
+                self.scene.resize(&mut self.inner, size.into());
             }
 
             WindowEvent::CloseRequested => {

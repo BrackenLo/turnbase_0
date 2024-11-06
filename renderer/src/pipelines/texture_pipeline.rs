@@ -5,9 +5,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::tools::Transform;
-
-use super::{
+use crate::{
     shared::{SharedRenderResources, Vertex},
     texture_storage::LoadedTexture,
     tools,
@@ -25,7 +23,7 @@ pub struct TexturePipeline {
 }
 
 impl TexturePipeline {
-    pub(super) fn new(
+    pub(crate) fn new(
         device: &wgpu::Device,
         config: &wgpu::SurfaceConfiguration,
         shared: &SharedRenderResources,
@@ -64,7 +62,7 @@ impl TexturePipeline {
         texture: &Arc<LoadedTexture>,
         size: glam::Vec2,
         color: [f32; 4],
-        transform: &Transform,
+        transform: impl Into<glam::Mat4>,
     ) {
         let instance = InstanceTexture {
             // common: InstanceCommon {
@@ -73,7 +71,7 @@ impl TexturePipeline {
             // },
             size,
             pad: [0.; 2],
-            transform: transform.to_matrix(),
+            transform: transform.into(),
             color: color.into(),
         };
 
@@ -86,7 +84,7 @@ impl TexturePipeline {
             .push(instance);
     }
 
-    pub(super) fn prep(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
+    pub(crate) fn prep(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
         let mut new_previous = HashSet::new();
 
         self.to_draw.drain().for_each(|(id, raw)| {
@@ -110,7 +108,7 @@ impl TexturePipeline {
         self.previous = new_previous;
     }
 
-    pub(super) fn render(
+    pub(crate) fn render(
         &mut self,
         pass: &mut wgpu::RenderPass,
         camera_bind_group: &wgpu::BindGroup,

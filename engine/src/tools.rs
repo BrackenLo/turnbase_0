@@ -39,6 +39,13 @@ impl<T> From<(T, T)> for Size<T> {
     }
 }
 
+impl<T> Into<(T, T)> for Size<T> {
+    #[inline]
+    fn into(self) -> (T, T) {
+        (self.width, self.height)
+    }
+}
+
 impl<T: Display> Display for Size<T> {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -320,6 +327,13 @@ impl Transform {
     #[inline]
     pub fn to_normal_matrix_array(&self) -> [f32; 9] {
         glam::Mat3::from_quat(self.rotation).to_cols_array()
+    }
+}
+
+impl Into<glam::Mat4> for &Transform {
+    #[inline]
+    fn into(self) -> glam::Mat4 {
+        glam::Mat4::from_scale_rotation_translation(self.scale, self.rotation, self.translation)
     }
 }
 

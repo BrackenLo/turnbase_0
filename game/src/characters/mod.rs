@@ -7,12 +7,9 @@ use std::{
 };
 
 use actions::Action;
-use engine::{
-    renderer::texture_storage::{DefaultTexture, LoadedTexture},
-    tools::Transform,
-    StateInner,
-};
+use engine::{tools::Transform, StateInner};
 use glam::Vec3Swizzles;
+use renderer::texture_storage::{DefaultTexture, LoadedTexture};
 
 pub mod actions;
 

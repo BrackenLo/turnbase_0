@@ -2,7 +2,8 @@
 
 use std::sync::Arc;
 
-use engine::{renderer::texture_storage::LoadedTexture, tools::Transform, StateInner};
+use engine::{tools::Transform, StateInner};
+use renderer::texture_storage::LoadedTexture;
 
 //====================================================================
 

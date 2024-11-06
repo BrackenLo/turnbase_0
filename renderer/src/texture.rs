@@ -2,8 +2,6 @@
 
 use image::GenericImageView;
 
-use crate::tools::Size;
-
 //====================================================================
 
 #[derive(Debug)]
@@ -18,12 +16,12 @@ impl Texture {
 
     pub fn create_depth_texture(
         device: &wgpu::Device,
-        window_size: Size<u32>,
+        window_size: (u32, u32),
         label: &str,
     ) -> Self {
         let size = wgpu::Extent3d {
-            width: window_size.width,
-            height: window_size.height,
+            width: window_size.0,
+            height: window_size.1,
             depth_or_array_layers: 1,
         };
 
@@ -160,15 +158,15 @@ impl Texture {
 
     pub fn from_size(
         device: &wgpu::Device,
-        size: Size<u32>,
+        size: (u32, u32),
         label: Option<&str>,
         sampler: Option<&wgpu::SamplerDescriptor>,
     ) -> Self {
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             label,
             size: wgpu::Extent3d {
-                width: size.width,
-                height: size.height,
+                width: size.0,
+                height: size.1,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,

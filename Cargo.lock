@@ -596,11 +596,9 @@ checksum = "60b1af1c220855b6ceac025d3f6ecdd2b7c4894bfe9cd9bda4fbb4bc7c0d4cf0"
 name = "engine"
 version = "0.1.0"
 dependencies = [
- "bytemuck",
  "glam",
- "image",
  "log",
- "pollster",
+ "renderer",
  "rustc-hash 2.0.0",
  "web-sys",
  "web-time",
@@ -718,6 +716,7 @@ dependencies = [
  "env_logger",
  "glam",
  "log",
+ "renderer",
  "wasm-bindgen",
  "wasm-bindgen-futures",
 ]
@@ -1918,6 +1917,21 @@ name = "renderdoc-sys"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19b30a45b0cd0bcca8037f3d0dc3421eaf95327a17cad11964fb8179b4fc4832"
+
+[[package]]
+name = "renderer"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "glam",
+ "image",
+ "log",
+ "pollster",
+ "raw-window-handle",
+ "rustc-hash 2.0.0",
+ "web-time",
+ "wgpu",
+]
 
 [[package]]
 name = "rgb"
