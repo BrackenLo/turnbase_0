@@ -573,6 +573,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "60b1af1c220855b6ceac025d3f6ecdd2b7c4894bfe9cd9bda4fbb4bc7c0d4cf0"
 
 [[package]]
+name = "engine"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "glam",
+ "image",
+ "log",
+ "pollster",
+ "rustc-hash 2.0.0",
+ "wgpu",
+ "winit",
+]
+
+[[package]]
 name = "env_filter"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -671,6 +685,16 @@ name = "foreign-types-shared"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aa9a19cbb55df58761df49b23516a86d432839add4af60fc256da840f66ed35b"
+
+[[package]]
+name = "game"
+version = "0.1.0"
+dependencies = [
+ "engine",
+ "env_logger",
+ "glam",
+ "log",
+]
 
 [[package]]
 name = "gethostname"
@@ -2218,15 +2242,7 @@ checksum = "5902c5d130972a0000f60860bfbf46f7ca3db5391eddfedd1b8728bd9dc96c0e"
 name = "turnbase_solo"
 version = "0.1.0"
 dependencies = [
- "bytemuck",
- "env_logger",
- "glam",
- "image",
- "log",
- "pollster",
- "rustc-hash 2.0.0",
- "wgpu",
- "winit",
+ "game",
 ]
 
 [[package]]

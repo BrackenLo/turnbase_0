@@ -1,6 +1,6 @@
 //====================================================================
 
-use crate::engine::{scene::Scene, tools::Transform, StateInner};
+use engine::{scene::Scene, tools::Transform, StateInner};
 
 //====================================================================
 
@@ -17,6 +17,12 @@ impl Scene for EmptyScene {
             [1., 0., 0., 1.],
             &Transform::default(),
         );
+
+        crate::camera::move_camera(state);
+    }
+
+    fn resize(&mut self, state: &mut StateInner, new_size: engine::tools::Size<u32>) {
+        state.renderer.camera.camera.aspect = new_size.width as f32 / new_size.height as f32;
     }
 }
 

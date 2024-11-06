@@ -5,14 +5,12 @@ use std::{
     sync::Arc,
 };
 
-use crate::engine::{
-    renderer::tools::{self, RenderPipelineDescriptor},
-    tools::Transform,
-};
+use crate::tools::Transform;
 
 use super::{
     shared::{SharedRenderResources, Vertex},
     texture_storage::LoadedTexture,
+    tools,
 };
 
 //====================================================================
@@ -40,7 +38,7 @@ impl TexturePipeline {
             &[camera_bind_group_layout, shared.texture_bind_group_layout()],
             &[InstanceTexture::desc()],
             include_str!("shaders/texture.wgsl"),
-            RenderPipelineDescriptor {
+            tools::RenderPipelineDescriptor {
                 primitive: wgpu::PrimitiveState {
                     topology: wgpu::PrimitiveTopology::TriangleStrip,
                     ..Default::default()

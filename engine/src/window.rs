@@ -8,6 +8,8 @@ use winit::{
     event_loop::{ActiveEventLoop, EventLoop},
 };
 
+use crate::scene::Scene;
+
 use super::{tools::Size, State};
 
 //====================================================================
@@ -25,13 +27,17 @@ impl Window {
 
 pub struct Runner {
     state: Option<State>,
+    default_scene: Option<Box<dyn Scene>>,
 }
 
 impl Runner {
-    pub fn run() {
+    pub fn run(default_scene: Box<dyn Scene>) {
         EventLoop::new()
             .unwrap()
-            .run_app(&mut Self { state: None })
+            .run_app(&mut Self {
+                state: None,
+                default_scene: Some(default_scene),
+            })
             .unwrap();
     }
 }
@@ -42,7 +48,7 @@ impl ApplicationHandler for Runner {
 
         match self.state {
             Some(_) => log::warn!("State already exists."),
-            None => self.state = Some(State::new(event_loop)),
+            None => self.state = Some(State::new(event_loop, self.default_scene.take().unwrap())),
         }
     }
 

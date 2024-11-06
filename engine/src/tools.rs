@@ -105,6 +105,8 @@ pub fn tick_time(time: &mut Time) {
 
 //====================================================================
 
+pub use winit::keyboard::KeyCode;
+
 #[derive(Debug)]
 pub struct Input<T> {
     pressed: HashSet<T, Hasher>,

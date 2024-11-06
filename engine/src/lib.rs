@@ -13,8 +13,6 @@ use winit::{
     window::{WindowAttributes, WindowId},
 };
 
-use crate::game::scenes::EmptyScene;
-
 pub mod renderer;
 pub mod scene;
 pub mod tools;
@@ -30,7 +28,7 @@ pub struct State {
 }
 
 pub struct StateInner {
-    pub fps: Duration,
+    pub target_fps: Duration,
     pub window: Window,
     pub renderer: Renderer,
     pub keys: Input<KeyCode>,
@@ -38,8 +36,8 @@ pub struct StateInner {
 }
 
 impl State {
-    pub fn new(event_loop: &ActiveEventLoop) -> Self {
-        let fps = Duration::from_secs_f32(DEFAULT_FPS);
+    pub fn new(event_loop: &ActiveEventLoop, default_scene: Box<dyn Scene>) -> Self {
+        let target_fps = Duration::from_secs_f32(DEFAULT_FPS);
         let window = Window(Arc::new(
             event_loop
                 .create_window(WindowAttributes::default())
@@ -50,13 +48,13 @@ impl State {
 
         Self {
             inner: StateInner {
-                fps,
+                target_fps,
                 window,
                 renderer,
                 keys: Input::default(),
                 time: Time::default(),
             },
-            scene: Box::new(EmptyScene::new()),
+            scene: default_scene,
         }
     }
 
@@ -78,6 +76,7 @@ impl State {
                 }
                 let size = physical_size.into();
                 self.inner.renderer.resize(size);
+                self.scene.resize(&mut self.inner, size);
             }
 
             WindowEvent::CloseRequested => {
@@ -99,7 +98,7 @@ impl State {
             //
             WindowEvent::RedrawRequested => {
                 event_loop.set_control_flow(winit::event_loop::ControlFlow::wait_duration(
-                    self.inner.fps,
+                    self.inner.target_fps,
                 ));
 
                 self.tick();

@@ -2,7 +2,7 @@
 
 use image::GenericImageView;
 
-use crate::engine::tools::Size;
+use crate::tools::Size;
 
 //====================================================================
 

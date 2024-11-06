@@ -1,6 +1,6 @@
 //====================================================================
 
-use crate::engine::StateInner;
+use crate::{tools::Size, StateInner};
 
 //====================================================================
 
@@ -10,6 +10,7 @@ pub trait Scene {
         Self: Sized;
 
     fn tick(&mut self, state: &mut StateInner);
+    fn resize(&mut self, state: &mut StateInner, new_size: Size<u32>);
 }
 
 //====================================================================
