@@ -1,6 +1,6 @@
 //====================================================================
 
-use crate::engine::{scene::Scene, StateInner};
+use crate::engine::{scene::Scene, tools::Transform, StateInner};
 
 //====================================================================
 
@@ -10,7 +10,14 @@ impl Scene for EmptyScene {
         Self
     }
 
-    fn tick(&mut self, _state: &mut StateInner) {}
+    fn tick(&mut self, state: &mut StateInner) {
+        state.renderer.texture_pipeline.draw_texture(
+            state.renderer.default_texture.texture(),
+            glam::vec2(50., 50.),
+            [1., 0., 0., 1.],
+            &Transform::default(),
+        );
+    }
 }
 
 //====================================================================

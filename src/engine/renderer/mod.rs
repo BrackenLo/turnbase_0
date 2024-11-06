@@ -1,18 +1,59 @@
 //====================================================================
 
+use std::sync::Arc;
+
+use camera::Camera;
+use pipelines::TexturePipeline;
 use pollster::FutureExt;
+use shared::SharedRenderResources;
+use texture::Texture;
+use texture_storage::{DefaultTexture, LoadedTexture};
 
 use super::{tools::Size, window::Window};
+
+pub mod camera;
+pub mod pipelines;
+pub mod shared;
+pub mod texture;
+pub mod texture_storage;
+pub mod tools;
 
 //====================================================================
 
 pub struct Renderer {
     core: RendererCore,
-    clear_color: wgpu::Color,
+    shared: SharedRenderResources,
+    depth_texture: Texture,
+    pub default_texture: DefaultTexture,
+
+    pub camera: Camera,
+    pub clear_color: wgpu::Color,
+
+    pub texture_pipeline: TexturePipeline,
 }
 
 impl Renderer {
     pub fn new(window: &Window) -> Self {
+        let core = RendererCore::new(window).block_on();
+        let shared = SharedRenderResources::new(&core.device);
+
+        let depth_texture =
+            Texture::create_depth_texture(&core.device, window.size(), "Depth Texture");
+
+        let default_texture = DefaultTexture::new(Arc::new(LoadedTexture::load_texture(
+            &core.device,
+            &shared,
+            Texture::from_color(
+                &core.device,
+                &core.queue,
+                [255; 3],
+                Some("Default Texture"),
+                None,
+            ),
+        )));
+
+        let camera = Camera::new(&core.device, camera::PerspectiveCamera::default());
+
         let clear_color = wgpu::Color {
             r: 0.2,
             g: 0.2,
@@ -20,9 +61,21 @@ impl Renderer {
             a: 1.,
         };
 
+        let texture_pipeline = TexturePipeline::new(
+            &core.device,
+            &core.config,
+            &shared,
+            camera.bind_group_layout(),
+        );
+
         Self {
-            core: RendererCore::new(window).block_on(),
+            core,
+            shared,
+            depth_texture,
+            default_texture,
+            camera,
             clear_color,
+            texture_pipeline,
         }
     }
 
@@ -32,6 +85,9 @@ impl Renderer {
         self.core
             .surface
             .configure(&self.core.device, &self.core.config);
+
+        self.depth_texture =
+            Texture::create_depth_texture(&self.core.device, new_size, "Depth Texture");
     }
 
     #[inline]
@@ -40,7 +96,12 @@ impl Renderer {
         self.render();
     }
 
-    fn update(&mut self) {}
+    fn update(&mut self) {
+        self.camera.update_camera(&self.core.queue);
+
+        self.texture_pipeline
+            .prep(&self.core.device, &self.core.queue);
+    }
 
     fn render(&mut self) {
         let mut encoder =
@@ -63,7 +124,7 @@ impl Renderer {
             }
         };
 
-        let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Main Render Pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: &surface_view,
@@ -73,12 +134,21 @@ impl Renderer {
                     store: wgpu::StoreOp::Store,
                 },
             })],
-            depth_stencil_attachment: None,
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: &self.depth_texture.view,
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.),
+                    store: wgpu::StoreOp::Store,
+                }),
+                stencil_ops: None,
+            }),
             timestamp_writes: None,
             occlusion_query_set: None,
         });
 
         // Render stuff here
+        self.texture_pipeline
+            .render(&mut render_pass, self.camera.bind_group());
 
         // Finish render pass
         std::mem::drop(render_pass);

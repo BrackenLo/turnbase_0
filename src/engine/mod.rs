@@ -4,10 +4,12 @@ use std::{sync::Arc, time::Duration};
 
 use renderer::Renderer;
 use scene::Scene;
+use tools::{Input, Time};
 use window::Window;
 use winit::{
     event::{DeviceEvent, DeviceId, WindowEvent},
     event_loop::ActiveEventLoop,
+    keyboard::KeyCode,
     window::{WindowAttributes, WindowId},
 };
 
@@ -31,6 +33,8 @@ pub struct StateInner {
     pub fps: Duration,
     pub window: Window,
     pub renderer: Renderer,
+    pub keys: Input<KeyCode>,
+    pub time: Time,
 }
 
 impl State {
@@ -49,6 +53,8 @@ impl State {
                 fps,
                 window,
                 renderer,
+                keys: Input::default(),
+                time: Time::default(),
             },
             scene: Box::new(EmptyScene::new()),
         }
@@ -81,7 +87,11 @@ impl State {
 
             WindowEvent::Destroyed => log::error!("Window was destroyed"),
 
-            // WindowEvent::KeyboardInput { event, .. } => {}
+            WindowEvent::KeyboardInput { event, .. } => {
+                if let winit::keyboard::PhysicalKey::Code(key) = event.physical_key {
+                    tools::process_inputs(&mut self.inner.keys, key, event.state.is_pressed())
+                }
+            }
             //
             // WindowEvent::CursorMoved { position, .. } => {}
             // WindowEvent::MouseWheel { delta, .. } => {}
@@ -114,8 +124,12 @@ impl State {
     }
 
     pub fn tick(&mut self) {
+        tools::tick_time(&mut self.inner.time);
+
         self.scene.tick(&mut self.inner);
         self.inner.renderer.tick();
+
+        tools::reset_input(&mut self.inner.keys);
     }
 }
 
