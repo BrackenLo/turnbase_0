@@ -4,7 +4,6 @@ use std::sync::Arc;
 
 use camera::Camera;
 use pipelines::TexturePipeline;
-use pollster::FutureExt;
 use shared::SharedRenderResources;
 use texture::Texture;
 use texture_storage::{DefaultTexture, LoadedTexture};
@@ -34,11 +33,17 @@ pub struct Renderer {
 
 impl Renderer {
     pub fn new(window: &Window) -> Self {
-        let core = RendererCore::new(window).block_on();
+        let core = pollster::block_on(RendererCore::new(window));
         let shared = SharedRenderResources::new(&core.device);
 
-        let depth_texture =
-            Texture::create_depth_texture(&core.device, window.size(), "Depth Texture");
+        let depth_texture = Texture::create_depth_texture(
+            &core.device,
+            match window.size() {
+                Size { width: 0, .. } | Size { height: 0, .. } => Size::new(450, 400),
+                _ => window.size(),
+            },
+            "Depth Texture",
+        );
 
         let default_texture = DefaultTexture::new(Arc::new(LoadedTexture::load_texture(
             &core.device,
@@ -171,10 +176,18 @@ impl RendererCore {
     pub async fn new(window: &Window) -> Self {
         log::debug!("Creating core wgpu renderer components.");
 
-        let size = window.size();
+        let size = match window.size() {
+            Size { width: 0, .. } | Size { height: 0, .. } => Size::new(450, 400),
+            _ => window.size(),
+        };
+
+        log::debug!("Window inner size = {:?}", size);
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+            #[cfg(not(target_arch = "wasm32"))]
             backends: wgpu::Backends::PRIMARY,
+            #[cfg(target_arch = "wasm32")]
+            backends: wgpu::Backends::GL,
             ..Default::default()
         });
 
@@ -192,7 +205,14 @@ impl RendererCore {
         log::debug!("Chosen device adapter: {:#?}", adapter.get_info());
 
         let (device, queue) = adapter
-            .request_device(&wgpu::DeviceDescriptor::default(), None)
+            .request_device(
+                &wgpu::DeviceDescriptor {
+                    #[cfg(target_arch = "wasm32")]
+                    required_limits: wgpu::Limits::downlevel_webgl2_defaults(),
+                    ..Default::default()
+                },
+                None,
+            )
             .await
             .unwrap();
 

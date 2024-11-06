@@ -4,10 +4,10 @@ use std::{
     collections::HashSet,
     fmt::Display,
     hash::{BuildHasherDefault, Hash},
-    time::{Duration, Instant},
 };
 
 use rustc_hash::FxHasher;
+use web_time::{Duration, Instant};
 
 //====================================================================
 

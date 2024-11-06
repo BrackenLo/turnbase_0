@@ -6,6 +6,7 @@ use winit::{
     application::ApplicationHandler,
     event::StartCause,
     event_loop::{ActiveEventLoop, EventLoop},
+    window::WindowAttributes,
 };
 
 use crate::scene::Scene;
@@ -17,6 +18,36 @@ use super::{tools::Size, State};
 #[derive(Clone)]
 pub struct Window(pub Arc<winit::window::Window>);
 impl Window {
+    pub(super) fn new(event_loop: &ActiveEventLoop) -> Self {
+        let window = event_loop
+            .create_window(WindowAttributes::default())
+            .unwrap();
+
+        #[cfg(target_arch = "wasm32")]
+        {
+            use winit::{dpi::PhysicalSize, platform::web::WindowExtWebSys};
+
+            log::info!("Adding canvas to window");
+
+            match window.request_inner_size(PhysicalSize::new(450, 400)) {
+                Some(_) => {}
+                None => log::warn!("Got none when requesting window inner size"),
+            };
+
+            web_sys::window()
+                .and_then(|win| win.document())
+                .and_then(|doc| {
+                    let dst = doc.get_element_by_id("game")?;
+                    let canvas = web_sys::Element::from(window.canvas()?);
+                    dst.append_child(&canvas).ok()?;
+                    Some(())
+                })
+                .expect("Couldn't append canvas to document body.");
+        }
+
+        Self(Arc::new(window))
+    }
+
     #[inline]
     pub fn size(&self) -> Size<u32> {
         self.0.inner_size().into()

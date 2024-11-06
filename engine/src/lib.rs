@@ -1,6 +1,6 @@
 //====================================================================
 
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
 use renderer::Renderer;
 use scene::Scene;
@@ -10,7 +10,7 @@ use winit::{
     event::{DeviceEvent, DeviceId, WindowEvent},
     event_loop::ActiveEventLoop,
     keyboard::KeyCode,
-    window::{WindowAttributes, WindowId},
+    window::WindowId,
 };
 
 pub mod renderer;
@@ -38,11 +38,7 @@ pub struct StateInner {
 impl State {
     pub fn new<S: Scene>(event_loop: &ActiveEventLoop) -> Self {
         let target_fps = Duration::from_secs_f32(DEFAULT_FPS);
-        let window = Window(Arc::new(
-            event_loop
-                .create_window(WindowAttributes::default())
-                .unwrap(),
-        ));
+        let window = Window::new(event_loop);
 
         let renderer = Renderer::new(&window);
 

@@ -3,6 +3,9 @@ name = "engine"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+crate-type = ["cdylib", "rlib"]
+
 [dependencies]
 bytemuck = { version = "1.19.0", features = ["derive"] }
 glam = { version = "0.29.2", features = ["bytemuck"] }
@@ -10,5 +13,10 @@ image = "0.25.5"
 log = "0.4.22"
 pollster = "0.4.0"
 rustc-hash = "2.0.0"
-wgpu = "23.0.0"
+web-time = "1.1.0"
+wgpu = "23"
 winit = "0.30.5"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wgpu = { version = "23", features = ["webgl"] }
+web-sys = { version = "0.3", features = ["Document", "Window", "Element"] }
