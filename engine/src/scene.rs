@@ -4,8 +4,8 @@ use crate::{tools::Size, StateInner};
 
 //====================================================================
 
-pub trait Scene {
-    fn new() -> Self
+pub trait Scene: 'static {
+    fn new(state: &mut StateInner) -> Self
     where
         Self: Sized;
 

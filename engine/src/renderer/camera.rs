@@ -32,6 +32,11 @@ impl Camera {
     pub fn bind_group(&self) -> &wgpu::BindGroup {
         self.data.bind_group()
     }
+
+    #[inline]
+    pub fn set_aspect(&mut self, width: f32, height: f32) {
+        self.camera.aspect = width / height;
+    }
 }
 
 //====================================================================

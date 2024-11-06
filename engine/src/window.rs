@@ -1,6 +1,6 @@
 //====================================================================
 
-use std::sync::Arc;
+use std::{marker::PhantomData, sync::Arc};
 
 use winit::{
     application::ApplicationHandler,
@@ -25,30 +25,30 @@ impl Window {
 
 //====================================================================
 
-pub struct Runner {
+pub struct Runner<S: Scene> {
     state: Option<State>,
-    default_scene: Option<Box<dyn Scene>>,
+    default_scene: PhantomData<S>,
 }
 
-impl Runner {
-    pub fn run(default_scene: Box<dyn Scene>) {
+impl<S: Scene> Runner<S> {
+    pub fn run() {
         EventLoop::new()
             .unwrap()
             .run_app(&mut Self {
                 state: None,
-                default_scene: Some(default_scene),
+                default_scene: PhantomData,
             })
             .unwrap();
     }
 }
 
-impl ApplicationHandler for Runner {
+impl<S: Scene> ApplicationHandler for Runner<S> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         log::trace!("App Resumed - Creating state.");
 
         match self.state {
             Some(_) => log::warn!("State already exists."),
-            None => self.state = Some(State::new(event_loop, self.default_scene.take().unwrap())),
+            None => self.state = Some(State::new::<S>(event_loop)),
         }
     }
 

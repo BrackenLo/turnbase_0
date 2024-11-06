@@ -3,6 +3,7 @@
 
 //====================================================================
 
+#[derive(Debug)]
 pub struct Action {
     name: String,
     target: TargetType,
@@ -10,6 +11,7 @@ pub struct Action {
     resolution: ActionResolution,
 }
 
+#[derive(Debug)]
 pub enum TargetType {
     None,
     Any,
@@ -18,6 +20,7 @@ pub enum TargetType {
     Enemey,
 }
 
+#[derive(Debug)]
 pub struct ActionResolution {}
 
 //====================================================================

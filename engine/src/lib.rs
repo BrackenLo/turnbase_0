@@ -36,7 +36,7 @@ pub struct StateInner {
 }
 
 impl State {
-    pub fn new(event_loop: &ActiveEventLoop, default_scene: Box<dyn Scene>) -> Self {
+    pub fn new<S: Scene>(event_loop: &ActiveEventLoop) -> Self {
         let target_fps = Duration::from_secs_f32(DEFAULT_FPS);
         let window = Window(Arc::new(
             event_loop
@@ -46,16 +46,17 @@ impl State {
 
         let renderer = Renderer::new(&window);
 
-        Self {
-            inner: StateInner {
-                target_fps,
-                window,
-                renderer,
-                keys: Input::default(),
-                time: Time::default(),
-            },
-            scene: default_scene,
-        }
+        let mut inner = StateInner {
+            target_fps,
+            window,
+            renderer,
+            keys: Input::default(),
+            time: Time::default(),
+        };
+
+        let scene = Box::new(S::new(&mut inner));
+
+        Self { inner, scene }
     }
 
     pub fn window_event(

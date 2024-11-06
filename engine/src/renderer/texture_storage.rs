@@ -8,6 +8,7 @@ use super::{shared::SharedRenderResources, texture::Texture};
 
 static CURRENT_TEXTURE_ID: AtomicU32 = AtomicU32::new(0);
 
+#[derive(Debug)]
 pub struct LoadedTexture {
     id: u32,
     _texture: Texture,
@@ -54,6 +55,7 @@ impl PartialEq for LoadedTexture {
 
 //====================================================================
 
+#[derive(Debug)]
 pub struct DefaultTexture {
     texture: Arc<LoadedTexture>,
 }
