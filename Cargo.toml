@@ -1,0 +1,13 @@
+[package]
+name = "turnbase_solo"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bytemuck = "1.19.0"
+env_logger = "0.11.5"
+glam = "0.29.2"
+log = "0.4.22"
+pollster = "0.4.0"
+wgpu = "23.0.0"
+winit = "0.30.5"
