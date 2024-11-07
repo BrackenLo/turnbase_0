@@ -197,8 +197,8 @@ impl Renderer {
     }
 
     #[inline]
-    pub fn create_ui(&mut self, options: Vec<String>) -> Ui3d {
-        self.ui3d_pipeline.create_ui(options)
+    pub fn create_ui(&mut self, options: Vec<String>, position: impl Into<glam::Vec3>) -> Ui3d {
+        self.ui3d_pipeline.create_ui(options, position)
     }
 
     #[inline]

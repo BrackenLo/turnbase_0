@@ -805,6 +805,7 @@ dependencies = [
  "env_logger",
  "glam",
  "log",
+ "rand",
  "renderer",
  "wasm-bindgen",
  "wasm-bindgen-futures",

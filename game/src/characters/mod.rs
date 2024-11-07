@@ -57,13 +57,13 @@ impl CharacterManager {
     }
 
     #[inline]
-    pub fn _character(&self, id: CharacterId) -> Option<&Character> {
-        self.characters.get(&id)
+    pub fn character(&self, id: &CharacterId) -> Option<&Character> {
+        self.characters.get(id)
     }
 
     #[inline]
-    pub fn character_mut(&mut self, id: CharacterId) -> Option<&mut Character> {
-        self.characters.get_mut(&id)
+    pub fn character_mut(&mut self, id: &CharacterId) -> Option<&mut Character> {
+        self.characters.get_mut(id)
     }
 
     #[inline]

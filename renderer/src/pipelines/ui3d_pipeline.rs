@@ -97,10 +97,7 @@ impl Ui3dRenderer {
                     format: Texture::DEPTH_FORMAT,
                     depth_write_enabled: true,
                     depth_compare: wgpu::CompareFunction::Always,
-                    stencil: wgpu::StencilState {
-                        write_mask: u32::MAX,
-                        ..Default::default()
-                    },
+                    stencil: wgpu::StencilState::default(),
                     bias: wgpu::DepthBiasState::default(),
                 }),
                 ..Default::default()
@@ -134,10 +131,7 @@ impl Ui3dRenderer {
                     format: Texture::DEPTH_FORMAT,
                     depth_write_enabled: true,
                     depth_compare: wgpu::CompareFunction::Always,
-                    stencil: wgpu::StencilState {
-                        write_mask: u32::MAX,
-                        ..Default::default()
-                    },
+                    stencil: wgpu::StencilState::default(),
                     bias: wgpu::DepthBiasState::default(),
                 }),
                 ..Default::default()
@@ -156,7 +150,7 @@ impl Ui3dRenderer {
         }
     }
 
-    pub fn create_ui(&mut self, options: Vec<String>) -> Ui3d {
+    pub fn create_ui(&mut self, options: Vec<String>, position: impl Into<glam::Vec3>) -> Ui3d {
         let id = self.current_id;
         self.current_id += 1;
 
@@ -167,7 +161,7 @@ impl Ui3dRenderer {
             options,
             selected: 0,
             font_size: 30.,
-            transform: Transform::from_scale((0.3, 0.3, 0.3)),
+            transform: Transform::from_scale_translation((0.3, 0.3, 0.3), position),
         }
     }
 
