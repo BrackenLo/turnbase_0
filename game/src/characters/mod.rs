@@ -7,7 +7,8 @@ use std::{
 };
 
 use actions::Action;
-use engine::{tools::Transform, StateInner};
+use common::Transform;
+use engine::StateInner;
 use glam::Vec3Swizzles;
 use renderer::texture_storage::{DefaultTexture, LoadedTexture};
 
@@ -56,7 +57,7 @@ impl CharacterManager {
     }
 
     #[inline]
-    pub fn character(&self, id: CharacterId) -> Option<&Character> {
+    pub fn _character(&self, id: CharacterId) -> Option<&Character> {
         self.characters.get(&id)
     }
 
@@ -84,6 +85,7 @@ impl CharacterManager {
 
 //====================================================================
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub struct Character {
     pub name: String,
@@ -96,6 +98,7 @@ pub struct Character {
     pub texture: Arc<LoadedTexture>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub struct CharacterStats {
     pub speed: u32,
@@ -122,7 +125,7 @@ impl Character {
     }
 
     pub fn render(&self, state: &mut StateInner) {
-        state.renderer.texture_pipeline.draw_texture(
+        state.renderer.draw_texture(
             &self.texture,
             glam::vec2(50., 50.),
             match self.front_facing {

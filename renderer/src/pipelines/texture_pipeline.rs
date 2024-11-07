@@ -1,7 +1,7 @@
 //====================================================================
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{hash_map::Entry, HashMap, HashSet},
     sync::Arc,
 };
 
@@ -13,7 +13,7 @@ use crate::{
 
 //====================================================================
 
-pub struct TexturePipeline {
+pub struct TextureRenderer {
     pipeline: wgpu::RenderPipeline,
     instances: HashMap<u32, TextureInstanceBuffer>,
 
@@ -22,7 +22,7 @@ pub struct TexturePipeline {
     to_draw: HashMap<u32, Vec<InstanceTexture>>,
 }
 
-impl TexturePipeline {
+impl TextureRenderer {
     pub(crate) fn new(
         device: &wgpu::Device,
         config: &wgpu::SurfaceConfiguration,
@@ -60,16 +60,12 @@ impl TexturePipeline {
     pub fn draw_texture(
         &mut self,
         texture: &Arc<LoadedTexture>,
-        size: glam::Vec2,
+        size: impl Into<glam::Vec2>,
         color: [f32; 4],
         transform: impl Into<glam::Mat4>,
     ) {
         let instance = InstanceTexture {
-            // common: InstanceCommon {
-            //     transform: transform.to_matrix(),
-            //     color: color.into(),
-            // },
-            size,
+            size: size.into(),
             pad: [0.; 2],
             transform: transform.into(),
             color: color.into(),
@@ -91,14 +87,19 @@ impl TexturePipeline {
             new_previous.insert(id);
             self.previous.remove(&id);
 
-            self.instances
-                .entry(id)
-                .and_modify(|instance| instance.update(device, queue, raw.as_slice()))
-                .or_insert(TextureInstanceBuffer::new(
-                    device,
-                    self.textures_to_add.remove(&id).unwrap(),
-                    raw.as_slice(),
-                ));
+            match self.instances.entry(id) {
+                Entry::Occupied(mut entry) => {
+                    entry.get_mut().update(device, queue, raw.as_slice());
+                }
+
+                Entry::Vacant(entry) => {
+                    entry.insert(TextureInstanceBuffer::new(
+                        device,
+                        self.textures_to_add.remove(&id).unwrap(),
+                        raw.as_slice(),
+                    ));
+                }
+            };
         });
 
         self.previous.iter().for_each(|to_remove| {

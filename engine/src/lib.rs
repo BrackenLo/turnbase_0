@@ -2,6 +2,7 @@
 
 use std::time::Duration;
 
+use common::Size;
 use renderer::Renderer;
 use scene::Scene;
 use tools::{Input, Time};
@@ -74,7 +75,10 @@ impl State {
                     );
                     return;
                 }
-                let size = physical_size.into();
+                let size = Size {
+                    width: physical_size.width,
+                    height: physical_size.height,
+                };
                 self.inner.renderer.resize(size);
                 self.scene.resize(&mut self.inner, size.into());
             }
@@ -125,7 +129,7 @@ impl State {
     pub fn tick(&mut self) {
         tools::tick_time(&mut self.inner.time);
 
-        self.scene.tick(&mut self.inner);
+        self.scene.update(&mut self.inner);
         self.inner.renderer.tick();
 
         tools::reset_input(&mut self.inner.keys);

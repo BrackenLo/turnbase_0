@@ -2,7 +2,9 @@
 
 use std::collections::HashSet;
 
+use common::Size;
 use engine::{scene::Scene, StateInner};
+use renderer::pipelines::ui3d_pipeline::Ui3d;
 
 use crate::{
     characters::{CharacterId, CharacterManager},
@@ -16,6 +18,8 @@ pub struct BattleScene {
 
     character_manager: CharacterManager,
     battle_manager: BattleManager,
+
+    ui: Ui3d,
 }
 
 impl Scene for BattleScene {
@@ -26,14 +30,28 @@ impl Scene for BattleScene {
         battle_manager.add_friendly(character_manager.spawn("Friendly"));
         battle_manager.add_enemy(character_manager.spawn("Enemy"));
 
+        let ui = state
+            .renderer
+            .create_ui(vec!["One".into(), "Two".into(), "Three".into()]);
+
         Self {
             scenery: Scenery::new(state),
             character_manager,
             battle_manager,
+            ui,
         }
     }
 
-    fn tick(&mut self, state: &mut StateInner) {
+    fn resize(&mut self, state: &mut StateInner, new_size: Size<u32>) {
+        state
+            .renderer
+            .camera
+            .set_aspect(new_size.width as f32, new_size.height as f32);
+    }
+
+    fn update(&mut self, state: &mut StateInner) {
+        state.renderer.draw_ui(&self.ui);
+
         crate::camera::move_camera(state);
         self.scenery.render(state);
 
@@ -48,13 +66,6 @@ impl Scene for BattleScene {
 
         self.character_manager.update(state);
         self.character_manager.render(state);
-    }
-
-    fn resize(&mut self, state: &mut StateInner, new_size: engine::tools::Size<u32>) {
-        state
-            .renderer
-            .camera
-            .set_aspect(new_size.width as f32, new_size.height as f32);
     }
 }
 

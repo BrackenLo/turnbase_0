@@ -2,6 +2,7 @@
 
 use std::{marker::PhantomData, sync::Arc};
 
+use common::Size;
 use winit::{
     application::ApplicationHandler,
     event::StartCause,
@@ -11,7 +12,7 @@ use winit::{
 
 use crate::scene::Scene;
 
-use super::{tools::Size, State};
+use super::State;
 
 //====================================================================
 
@@ -50,7 +51,12 @@ impl Window {
 
     #[inline]
     pub fn size(&self) -> Size<u32> {
-        self.0.inner_size().into()
+        let window_size = self.0.inner_size();
+
+        Size {
+            width: window_size.width,
+            height: window_size.height,
+        }
     }
 }
 

@@ -3,8 +3,13 @@
 use std::sync::Arc;
 
 use camera::Camera;
-use pipelines::texture_pipeline::TexturePipeline;
+use common::Size;
+use pipelines::{
+    texture_pipeline::TextureRenderer,
+    ui3d_pipeline::{Ui3d, Ui3dRenderer},
+};
 use shared::SharedRenderResources;
+use text_shared::TextResources;
 use texture::Texture;
 use texture_storage::{DefaultTexture, LoadedTexture};
 use wgpu::SurfaceTarget;
@@ -21,18 +26,20 @@ pub mod tools;
 
 pub struct Renderer {
     core: RendererCore,
-    shared: SharedRenderResources,
+    _shared: SharedRenderResources,
     depth_texture: Texture,
     pub default_texture: DefaultTexture,
 
     pub camera: Camera,
     pub clear_color: wgpu::Color,
 
-    pub texture_pipeline: TexturePipeline,
+    text_res: TextResources,
+    texture_pipeline: TextureRenderer,
+    ui3d_pipeline: Ui3dRenderer,
 }
 
 impl Renderer {
-    pub fn new(window: impl Into<SurfaceTarget<'static>>, window_size: (u32, u32)) -> Self {
+    pub fn new(window: impl Into<SurfaceTarget<'static>>, window_size: Size<u32>) -> Self {
         let core = pollster::block_on(RendererCore::new(window, window_size));
         let shared = SharedRenderResources::new(&core.device);
 
@@ -60,27 +67,38 @@ impl Renderer {
             a: 1.,
         };
 
-        let texture_pipeline = TexturePipeline::new(
+        let text_res = TextResources::new(&core.device);
+
+        let texture_pipeline = TextureRenderer::new(
             &core.device,
             &core.config,
             &shared,
             camera.bind_group_layout(),
         );
 
+        let ui3d_pipeline = Ui3dRenderer::new(
+            &core.device,
+            &core.config,
+            &text_res.text_atlas,
+            camera.bind_group_layout(),
+        );
+
         Self {
             core,
-            shared,
+            _shared: shared,
             depth_texture,
             default_texture,
             camera,
             clear_color,
+            text_res,
             texture_pipeline,
+            ui3d_pipeline,
         }
     }
 
-    pub fn resize(&mut self, new_size: (u32, u32)) {
-        self.core.config.width = new_size.0;
-        self.core.config.height = new_size.1;
+    pub fn resize(&mut self, new_size: Size<u32>) {
+        self.core.config.width = new_size.width;
+        self.core.config.height = new_size.height;
         self.core
             .surface
             .configure(&self.core.device, &self.core.config);
@@ -100,6 +118,8 @@ impl Renderer {
 
         self.texture_pipeline
             .prep(&self.core.device, &self.core.queue);
+
+        self.ui3d_pipeline.prep();
     }
 
     fn render(&mut self) {
@@ -149,11 +169,42 @@ impl Renderer {
         self.texture_pipeline
             .render(&mut render_pass, self.camera.bind_group());
 
-        // Finish render pass
-        std::mem::drop(render_pass);
+        self.ui3d_pipeline.render(
+            &mut render_pass,
+            &self.text_res.text_atlas,
+            self.camera.bind_group(),
+        );
 
+        std::mem::drop(render_pass);
         self.core.queue.submit(Some(encoder.finish()));
         surface_texture.present();
+
+        self.text_res.text_atlas.post_render_trim();
+    }
+}
+
+impl Renderer {
+    #[inline]
+    pub fn draw_texture(
+        &mut self,
+        texture: &Arc<LoadedTexture>,
+        size: impl Into<glam::Vec2>,
+        color: [f32; 4],
+        transform: impl Into<glam::Mat4>,
+    ) {
+        self.texture_pipeline
+            .draw_texture(texture, size, color, transform);
+    }
+
+    #[inline]
+    pub fn create_ui(&mut self, options: Vec<String>) -> Ui3d {
+        self.ui3d_pipeline.create_ui(options)
+    }
+
+    #[inline]
+    pub fn draw_ui(&mut self, ui: &Ui3d) {
+        self.ui3d_pipeline
+            .draw_ui(&self.core.device, &self.core.queue, &mut self.text_res, ui);
     }
 }
 
@@ -167,7 +218,7 @@ pub struct RendererCore {
 }
 
 impl RendererCore {
-    pub async fn new(window: impl Into<SurfaceTarget<'static>>, window_size: (u32, u32)) -> Self {
+    pub async fn new(window: impl Into<SurfaceTarget<'static>>, window_size: Size<u32>) -> Self {
         log::debug!("Creating core wgpu renderer components.");
 
         log::debug!("Window inner size = {:?}", window_size);
@@ -218,8 +269,8 @@ impl RendererCore {
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
-            width: window_size.0,
-            height: window_size.1,
+            width: window_size.width,
+            height: window_size.height,
             present_mode: wgpu::PresentMode::AutoNoVsync,
             desired_maximum_frame_latency: 2,
             alpha_mode: surface_capabilities.alpha_modes[0],

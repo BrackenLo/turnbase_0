@@ -2,7 +2,8 @@
 
 use std::sync::Arc;
 
-use engine::{tools::Transform, StateInner};
+use common::Transform;
+use engine::StateInner;
 use renderer::texture_storage::LoadedTexture;
 
 //====================================================================
@@ -24,7 +25,7 @@ impl Scenery {
     }
 
     pub fn render(&self, state: &mut StateInner) {
-        state.renderer.texture_pipeline.draw_texture(
+        state.renderer.draw_texture(
             &self.floor_tex,
             glam::vec2(500., 500.),
             [0.3, 0.3, 0.3, 1.],

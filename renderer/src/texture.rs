@@ -1,5 +1,6 @@
 //====================================================================
 
+use common::Size;
 use image::GenericImageView;
 
 //====================================================================
@@ -16,12 +17,12 @@ impl Texture {
 
     pub fn create_depth_texture(
         device: &wgpu::Device,
-        window_size: (u32, u32),
+        window_size: Size<u32>,
         label: &str,
     ) -> Self {
         let size = wgpu::Extent3d {
-            width: window_size.0,
-            height: window_size.1,
+            width: window_size.width,
+            height: window_size.height,
             depth_or_array_layers: 1,
         };
 
@@ -158,15 +159,15 @@ impl Texture {
 
     pub fn from_size(
         device: &wgpu::Device,
-        size: (u32, u32),
+        size: Size<u32>,
         label: Option<&str>,
         sampler: Option<&wgpu::SamplerDescriptor>,
     ) -> Self {
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             label,
             size: wgpu::Extent3d {
-                width: size.0,
-                height: size.1,
+                width: size.width,
+                height: size.height,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,

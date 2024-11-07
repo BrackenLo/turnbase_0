@@ -90,22 +90,14 @@ impl CameraData {
     pub fn update_camera<C: CameraUniform>(&self, queue: &wgpu::Queue, camera: &C) {
         const CAMERA_UNIFOM_SIZE: u64 = std::mem::size_of::<CameraUniformRaw>() as u64;
 
-        match queue.write_buffer_with(
-            &self.camera_buffer,
-            0,
-            wgpu::BufferSize::new(CAMERA_UNIFOM_SIZE).unwrap(),
-        ) {
-            Some(mut buffer) => {
-                buffer.copy_from_slice(bytemuck::cast_slice(&[camera.into_uniform()]))
-            }
-            None => log::warn!("Unable to update camera"),
-        }
-
-        // queue.write_buffer(
-        //     &self.camera_buffer,
-        //     0,
-        //     bytemuck::cast_slice(&[camera.into_uniform()]),
-        // );
+        queue
+            .write_buffer_with(
+                &self.camera_buffer,
+                0,
+                wgpu::BufferSize::new(CAMERA_UNIFOM_SIZE).unwrap(),
+            )
+            .unwrap()
+            .copy_from_slice(bytemuck::cast_slice(&[camera.into_uniform()]));
     }
 
     #[inline]
