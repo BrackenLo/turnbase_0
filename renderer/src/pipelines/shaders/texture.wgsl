@@ -16,15 +16,16 @@ struct Camera {
 
 struct VertexIn {
     // Vertex
-    @builtin(vertex_index) index: u32,
+    @location(0) vertex_position: vec2<f32>,
+    @location(1) uv: vec2<f32>,
 
     // Instance
-    @location(0) size: vec2<f32>,
-    @location(1) transform_1: vec4<f32>,
-    @location(2) transform_2: vec4<f32>,
-    @location(3) transform_3: vec4<f32>,
-    @location(4) transform_4: vec4<f32>,
-    @location(5) color: vec4<f32>,
+    @location(2) size: vec2<f32>,
+    @location(3) transform_1: vec4<f32>,
+    @location(4) transform_2: vec4<f32>,
+    @location(5) transform_3: vec4<f32>,
+    @location(6) transform_4: vec4<f32>,
+    @location(7) color: vec4<f32>,
 }
 
 struct VertexOut {
@@ -38,36 +39,6 @@ struct VertexOut {
 @vertex
 fn vs_main(in: VertexIn) -> VertexOut {
     var out: VertexOut;
-
-    var vertex_pos: vec2<f32>;
-
-    switch (in.index) {
-        // 0 = Top Left
-        case 0u: {
-            vertex_pos = vec2<f32>(-0.5, 0.5);
-            out.uv = vec2(0., 0.);
-            break;
-        }
-        // 1 = Top Right
-        case 2u: {
-            vertex_pos = vec2<f32>(0.5, 0.5);
-            out.uv = vec2<f32>(1., 0.);
-            break;
-        }
-        // Bottom Left
-        case 1u: {
-            vertex_pos = vec2<f32>(-0.5, -0.5);
-            out.uv = vec2<f32>(0., 1.);
-            break;
-        }
-        // Bottom Right
-        case 3u: {
-            vertex_pos = vec2<f32>(0.5, -0.5);
-            out.uv = vec2<f32>(1., 1.);
-            break;
-        }
-        default: {}
-    }
     
     let transform = mat4x4<f32>(
         in.transform_1,
@@ -76,13 +47,14 @@ fn vs_main(in: VertexIn) -> VertexOut {
         in.transform_4,
     );
 
-    vertex_pos *= in.size;
+    let vertex_pos = in.vertex_position * in.size;
 
     out.clip_position =
         camera.projection
         * transform
         * vec4<f32>(vertex_pos, 1., 1.);
 
+    out.uv = in.uv;
     out.color = in.color;
 
     return out;

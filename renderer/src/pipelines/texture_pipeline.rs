@@ -1,25 +1,40 @@
 //====================================================================
 
 use std::{
-    collections::{hash_map::Entry, HashMap, HashSet},
+    collections::{HashMap, HashSet},
     sync::Arc,
 };
 
+use common::Transform;
+use hecs::World;
+
 use crate::{
-    shared::{SharedRenderResources, Vertex},
+    shared::{
+        SharedRenderResources, TextureRectVertex, Vertex, TEXTURE_RECT_INDEX_COUNT,
+        TEXTURE_RECT_INDICES, TEXTURE_RECT_VERTICES,
+    },
     texture_storage::LoadedTexture,
     tools,
 };
 
 //====================================================================
 
+pub struct Sprite {
+    pub texture: Arc<LoadedTexture>,
+    pub size: glam::Vec2,
+    pub color: [f32; 4],
+}
+
+//====================================================================
+
 pub struct TextureRenderer {
     pipeline: wgpu::RenderPipeline,
-    instances: HashMap<u32, TextureInstanceBuffer>,
 
-    previous: HashSet<u32>,
-    textures_to_add: HashMap<u32, Arc<LoadedTexture>>,
-    to_draw: HashMap<u32, Vec<InstanceTexture>>,
+    vertex_buffer: wgpu::Buffer,
+    index_buffer: wgpu::Buffer,
+    index_count: u32,
+
+    instances: HashMap<u32, TextureInstanceBuffer>,
 }
 
 impl TextureRenderer {
@@ -34,7 +49,7 @@ impl TextureRenderer {
             config,
             "Texture Pipeline",
             &[camera_bind_group_layout, shared.texture_bind_group_layout()],
-            &[InstanceTexture::desc()],
+            &[TextureRectVertex::desc(), InstanceTexture::desc()],
             include_str!("shaders/texture.wgsl"),
             tools::RenderPipelineDescriptor {
                 primitive: wgpu::PrimitiveState {
@@ -46,67 +61,78 @@ impl TextureRenderer {
             .with_depth_stencil(),
         );
 
+        let vertex_buffer = tools::buffer(
+            device,
+            tools::BufferType::Vertex,
+            "Texture",
+            &TEXTURE_RECT_VERTICES,
+        );
+
+        let index_buffer = tools::buffer(
+            device,
+            tools::BufferType::Index,
+            "Texture",
+            &TEXTURE_RECT_INDICES,
+        );
+        let index_count = TEXTURE_RECT_INDEX_COUNT;
+
         let instances = HashMap::default();
 
         Self {
             pipeline,
+            vertex_buffer,
+            index_buffer,
+            index_count,
             instances,
-            previous: HashSet::default(),
-            to_draw: HashMap::default(),
-            textures_to_add: HashMap::default(),
         }
     }
 
-    pub fn draw_texture(
-        &mut self,
-        texture: &Arc<LoadedTexture>,
-        size: impl Into<glam::Vec2>,
-        color: [f32; 4],
-        transform: impl Into<glam::Mat4>,
-    ) {
-        let instance = InstanceTexture {
-            size: size.into(),
-            pad: [0.; 2],
-            transform: transform.into(),
-            color: color.into(),
-        };
+    pub(crate) fn prep(&mut self, world: &mut World, device: &wgpu::Device, queue: &wgpu::Queue) {
+        let mut previous = self.instances.keys().map(|id| *id).collect::<HashSet<_>>();
+        let mut textures_to_add = HashMap::new();
 
-        self.to_draw
-            .entry(texture.id())
-            .or_insert_with(|| {
-                self.textures_to_add.insert(texture.id(), texture.clone());
-                Vec::new()
-            })
-            .push(instance);
-    }
+        let instances = world.query_mut::<(&Transform, &Sprite)>().into_iter().fold(
+            HashMap::new(),
+            |mut acc, (_, (transform, sprite))| {
+                let instance = InstanceTexture {
+                    size: sprite.size,
+                    pad: [0.; 2],
+                    transform: transform.to_matrix(),
+                    color: sprite.color.into(),
+                };
 
-    pub(crate) fn prep(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
-        let mut new_previous = HashSet::new();
+                acc.entry(sprite.texture.id())
+                    .or_insert_with(|| {
+                        textures_to_add.insert(sprite.texture.id(), sprite.texture.clone());
+                        Vec::new()
+                    })
+                    .push(instance);
 
-        self.to_draw.drain().for_each(|(id, raw)| {
-            new_previous.insert(id);
-            self.previous.remove(&id);
+                acc
+            },
+        );
 
-            match self.instances.entry(id) {
-                Entry::Occupied(mut entry) => {
-                    entry.get_mut().update(device, queue, raw.as_slice());
-                }
+        instances.into_iter().for_each(|(id, raw)| {
+            previous.remove(&id);
 
-                Entry::Vacant(entry) => {
-                    entry.insert(TextureInstanceBuffer::new(
+            self.instances
+                .entry(id)
+                .and_modify(|instance| {
+                    instance.update(device, queue, raw.as_slice());
+                })
+                .or_insert_with(|| {
+                    TextureInstanceBuffer::new(
                         device,
-                        self.textures_to_add.remove(&id).unwrap(),
+                        textures_to_add.remove(&id).unwrap(),
                         raw.as_slice(),
-                    ));
-                }
-            };
+                    )
+                });
         });
 
-        self.previous.iter().for_each(|to_remove| {
-            self.instances.remove(to_remove);
+        previous.into_iter().for_each(|to_remove| {
+            log::trace!("Removing texture instance {}", to_remove);
+            self.instances.remove(&to_remove);
         });
-
-        self.previous = new_previous;
     }
 
     pub(crate) fn render(
@@ -117,10 +143,13 @@ impl TextureRenderer {
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(0, camera_bind_group, &[]);
 
+        pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+        pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+
         self.instances.iter().for_each(|(_, instance)| {
             pass.set_bind_group(1, instance.texture.bind_group(), &[]);
-            pass.set_vertex_buffer(0, instance.buffer.buffer().slice(..));
-            pass.draw(0..4, 0..instance.buffer.count());
+            pass.set_vertex_buffer(1, instance.buffer.buffer().slice(..));
+            pass.draw_indexed(0..self.index_count, 0, 0..instance.buffer.count());
         });
     }
 }
@@ -139,12 +168,12 @@ pub struct InstanceTexture {
 impl Vertex for InstanceTexture {
     fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
         const VERTEX_ATTRIBUTES: [wgpu::VertexAttribute; 6] = wgpu::vertex_attr_array![
-            0 => Float32x4, // Transform
-            1 => Float32x4,
-            2 => Float32x4,
+            2 => Float32x4, // Transform
             3 => Float32x4,
-            4 => Float32x4, // Color
-            5 => Float32x4, // Size
+            4 => Float32x4,
+            5 => Float32x4,
+            6 => Float32x4, // Color
+            7 => Float32x4, // Size
         ];
 
         wgpu::VertexBufferLayout {

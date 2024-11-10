@@ -26,11 +26,6 @@ struct Position {
 
 //====================================================================
 
-struct VertexIn {
-    // Vertex
-    @builtin(vertex_index) index: u32,
-}
-
 struct VertexOut {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) uv: vec2<f32>,
@@ -42,12 +37,12 @@ struct VertexOut {
 //====================================================================
 
 @vertex
-fn vs_main(in: VertexIn) -> VertexOut {
+fn vs_main(@builtin(vertex_index) index: u32) -> VertexOut {
     var out: VertexOut;
 
     var vertex_pos: vec2<f32>;
     
-    switch (in.index) {
+    switch (index) {
         // 0 = Top Left
         case 0u: {
             vertex_pos = vec2<f32>(-0.5, 0.5);

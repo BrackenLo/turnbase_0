@@ -250,7 +250,12 @@ impl<T: bytemuck::Pod> InstanceBuffer<T> {
     pub fn new(device: &wgpu::Device, data: &[T]) -> Self {
         Self {
             phantom: PhantomData,
-            buffer: buffer(device, BufferType::Instance, "", data),
+            buffer: buffer(
+                device,
+                BufferType::Instance,
+                &format!("{} Instance Buffer", std::any::type_name::<T>()),
+                data,
+            ),
             count: data.len() as u32,
         }
     }
@@ -260,7 +265,8 @@ impl<T: bytemuck::Pod> InstanceBuffer<T> {
         update_instance_buffer(
             device,
             queue,
-            "Instance Buffer",
+            &format!("{} Instance Buffer", std::any::type_name::<T>()),
+            // "Instance Buffer",
             &mut self.buffer,
             &mut self.count,
             data,

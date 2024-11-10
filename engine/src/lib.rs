@@ -3,6 +3,7 @@
 use std::time::Duration;
 
 use common::Size;
+use hecs::World;
 use renderer::Renderer;
 use scene::Scene;
 use tools::{Input, Time};
@@ -33,6 +34,8 @@ pub struct StateInner {
     pub renderer: Renderer,
     pub keys: Input<KeyCode>,
     pub time: Time,
+
+    pub world: World,
 }
 
 impl State {
@@ -46,12 +49,15 @@ impl State {
         #[cfg(target_arch = "wasm32")]
         let renderer = Renderer::new(window.0.clone(), (500, 450));
 
+        let world = World::new();
+
         let mut inner = StateInner {
             target_fps,
             window,
             renderer,
             keys: Input::default(),
             time: Time::default(),
+            world,
         };
 
         let scene = Box::new(S::new(&mut inner));
@@ -130,7 +136,7 @@ impl State {
         tools::tick_time(&mut self.inner.time);
 
         self.scene.update(&mut self.inner);
-        self.inner.renderer.tick();
+        self.inner.renderer.tick(&mut self.inner.world);
 
         tools::reset_input(&mut self.inner.keys);
     }

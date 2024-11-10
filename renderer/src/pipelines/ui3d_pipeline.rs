@@ -4,6 +4,8 @@ use std::collections::{HashMap, HashSet};
 
 use common::Transform;
 use cosmic_text::{Metrics, Wrap};
+use hecs::{Entity, World};
+use wgpu::util::DeviceExt;
 
 use crate::{
     shared::Vertex,
@@ -16,16 +18,27 @@ use crate::{
 
 #[derive(Debug, Clone)]
 pub struct Ui3d {
-    id: u32,
     pub menu_color: [f32; 4],
     pub selection_color: [f32; 4],
 
     pub options: Vec<String>,
     pub selected: u8,
     pub font_size: f32,
-    pub transform: Transform,
 }
 
+impl Default for Ui3d {
+    fn default() -> Self {
+        Self {
+            menu_color: [0.5, 0.5, 0.5, 0.7],
+            selection_color: [0.7, 0.7, 0.7, 0.8],
+            options: Vec::new(),
+            selected: 0,
+            font_size: 30.,
+        }
+    }
+}
+
+#[derive(Debug)]
 struct Ui3dData {
     ui_uniform_buffer: wgpu::Buffer,
     ui_uniform_bind_group: wgpu::BindGroup,
@@ -46,10 +59,7 @@ pub struct Ui3dRenderer {
     ui_uniform_bind_group_layout: wgpu::BindGroupLayout,
     ui_position_uniform_bind_group_layout: wgpu::BindGroupLayout,
 
-    current_id: u32,
-    to_draw: HashSet<u32>,
-    previous: HashSet<u32>,
-    instances: HashMap<u32, Ui3dData>,
+    instances: HashMap<Entity, Ui3dData>,
 }
 
 impl Ui3dRenderer {
@@ -95,14 +105,13 @@ impl Ui3dRenderer {
                 })]),
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: Texture::DEPTH_FORMAT,
-                    depth_write_enabled: true,
+                    depth_write_enabled: false,
                     depth_compare: wgpu::CompareFunction::Always,
                     stencil: wgpu::StencilState::default(),
                     bias: wgpu::DepthBiasState::default(),
                 }),
                 ..Default::default()
-            }
-            .with_backface_culling(),
+            },
         );
 
         let text_pipeline = tools::create_pipeline(
@@ -129,7 +138,7 @@ impl Ui3dRenderer {
                 })]),
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: Texture::DEPTH_FORMAT,
-                    depth_write_enabled: true,
+                    depth_write_enabled: false,
                     depth_compare: wgpu::CompareFunction::Always,
                     stencil: wgpu::StencilState::default(),
                     bias: wgpu::DepthBiasState::default(),
@@ -143,143 +152,202 @@ impl Ui3dRenderer {
             text_pipeline,
             ui_uniform_bind_group_layout,
             ui_position_uniform_bind_group_layout,
-            current_id: 0,
-            previous: HashSet::default(),
-            to_draw: HashSet::default(),
             instances: HashMap::default(),
         }
     }
 
-    pub fn create_ui(&mut self, options: Vec<String>, position: impl Into<glam::Vec3>) -> Ui3d {
-        let id = self.current_id;
-        self.current_id += 1;
-
-        Ui3d {
-            id,
-            menu_color: [0.5, 0.5, 0.5, 0.7],
-            selection_color: [0.7, 0.7, 0.7, 0.8],
-            options,
-            selected: 0,
-            font_size: 30.,
-            transform: Transform::from_scale_translation((0.3, 0.3, 0.3), position),
-        }
+    pub(crate) fn prep_rotations(&self, world: &World, camera_pos: glam::Vec3) {
+        // All ui look at camera
+        world
+            .query::<(&mut Transform, &Ui3d)>()
+            .iter()
+            .for_each(|(_, (transform, _))| transform.look_at(camera_pos, glam::Vec3::Y));
     }
 
     // Prep text
-    pub fn draw_ui(
+    pub(crate) fn prep(
         &mut self,
+        world: &mut World,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         text_res: &mut TextResources,
-        ui: &Ui3d,
     ) {
-        if !self.instances.contains_key(&ui.id) {
-            self.insert_ui(device, &mut text_res.font_system, ui);
-        }
+        let mut previous = self.instances.keys().map(|id| *id).collect::<HashSet<_>>();
 
-        let data = self.instances.get_mut(&ui.id).unwrap();
+        world
+            .query_mut::<&Ui3d>()
+            .into_iter()
+            .for_each(|(entity, ui)| {
+                previous.remove(&entity);
 
-        let position_raw = UiPositionUniformRaw {
-            transform: ui.transform.to_matrix(),
-        };
+                if !self.instances.contains_key(&entity) {
+                    self.insert_ui(device, &mut text_res.font_system, entity, ui)
+                }
+            });
 
-        queue
-            .write_buffer_with(
-                &data.ui_position_uniform_buffer,
-                0,
-                wgpu::BufferSize::new(std::mem::size_of::<UiPositionUniformRaw>() as u64).unwrap(),
-            )
-            .unwrap()
-            .copy_from_slice(bytemuck::cast_slice(&[position_raw]));
+        self.prep_text(world, device, queue, text_res);
+        self.prep_ui(world, queue, &mut text_res.font_system);
 
-        let longest_line = ui.options.iter().reduce(|a, b| match a.len() < b.len() {
-            true => a,
-            false => b,
+        previous.into_iter().for_each(|to_remove| {
+            self.instances.remove(&to_remove);
         });
+    }
 
-        let longest_line = match longest_line {
-            Some(val) => val,
-            None => return,
-        };
+    fn prep_text(
+        &mut self,
+        world: &mut World,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        text_res: &mut TextResources,
+    ) {
+        world
+            .query_mut::<&Ui3d>()
+            .into_iter()
+            .for_each(|(entity, _)| {
+                let data = match self.instances.get_mut(&entity) {
+                    Some(data) => data,
+                    None => return,
+                };
 
-        let selected = ui.selected.clamp(0, ui.options.len() as u8) as f32;
+                if let Some(rebuild) = crate::text_shared::prep(
+                    device,
+                    queue,
+                    &mut text_res.font_system,
+                    &mut text_res.swash_cache,
+                    &mut text_res.text_atlas,
+                    &mut data.text_buffer,
+                ) {
+                    log::trace!("Rebuilding text for ui entity {:?}", entity);
+                    tools::update_instance_buffer(
+                        device,
+                        queue,
+                        "UI3d Text Vertex Buffer",
+                        &mut data.text_buffer.vertex_buffer,
+                        &mut data.text_buffer.vertex_count,
+                        &rebuild,
+                    );
+                }
+            });
+    }
 
-        let option_count = ui.options.len() as f32;
-        let option_range = 1. / option_count;
+    fn prep_ui(
+        &mut self,
+        world: &mut World,
+        queue: &wgpu::Queue,
+        font_system: &mut cosmic_text::FontSystem,
+    ) {
+        world
+            .query_mut::<(&Transform, &Ui3d)>()
+            .into_iter()
+            .for_each(|(entity, (transform, ui))| {
+                let data = self.instances.get_mut(&entity).unwrap();
 
-        let ui_size = glam::vec2(
-            ui.font_size * longest_line.len() as f32,
-            ui.font_size * option_count,
-        );
+                let position_raw = UiPositionUniformRaw {
+                    transform: transform.to_matrix(),
+                };
 
-        let ui_raw = UiUniformRaw {
-            size: ui_size,
-            menu_color: ui.menu_color.into(),
-            selection_color: ui.selection_color.into(),
-            selection_range_y: glam::vec2(option_range * selected, option_range * (selected + 1.)),
+                queue
+                    .write_buffer_with(
+                        &data.ui_position_uniform_buffer,
+                        0,
+                        wgpu::BufferSize::new(std::mem::size_of::<UiPositionUniformRaw>() as u64)
+                            .unwrap(),
+                    )
+                    .unwrap()
+                    .copy_from_slice(bytemuck::cast_slice(&[position_raw]));
 
-            pad: [0.; 2],
-            pad2: [0.; 2],
-        };
+                // queue.write_buffer(
+                //     &data.ui_position_uniform_buffer,
+                //     0,
+                //     bytemuck::cast_slice(&[position_raw]),
+                // );
 
-        queue
-            .write_buffer_with(
-                &data.ui_uniform_buffer,
-                0,
-                wgpu::BufferSize::new(std::mem::size_of::<UiUniformRaw>() as u64).unwrap(),
-            )
-            .unwrap()
-            .copy_from_slice(bytemuck::cast_slice(&[ui_raw]));
+                let longest_line = ui.options.iter().reduce(|a, b| match a.len() < b.len() {
+                    true => a,
+                    false => b,
+                });
 
-        data.size = ui_size.to_array();
+                let longest_line = match longest_line {
+                    Some(val) => val,
+                    None => return,
+                };
 
-        data.text_buffer.set_metrics(
-            &mut text_res.font_system,
-            Metrics::new(ui.font_size, ui.font_size),
-        );
+                let selected = ui.selected.clamp(0, ui.options.len() as u8) as f32;
 
-        if let Some(rebuild) = crate::text_shared::prep(
-            device,
-            queue,
-            &mut text_res.font_system,
-            &mut text_res.swash_cache,
-            &mut text_res.text_atlas,
-            &mut data.text_buffer,
-        ) {
-            tools::update_instance_buffer(
-                device,
-                queue,
-                "UI3d Text Vertex Buffer",
-                &mut data.text_buffer.vertex_buffer,
-                &mut data.text_buffer.vertex_count,
-                &rebuild,
-            );
-        }
+                let option_count = ui.options.len() as f32;
+                let option_range = 1. / option_count;
 
-        self.to_draw.insert(ui.id);
+                let ui_size = glam::vec2(
+                    ui.font_size * longest_line.len() as f32,
+                    ui.font_size * option_count,
+                );
+
+                let ui_raw = UiUniformRaw {
+                    size: ui_size,
+                    menu_color: ui.menu_color.into(),
+                    selection_color: ui.selection_color.into(),
+                    selection_range_y: glam::vec2(
+                        option_range * selected,
+                        option_range * (selected + 1.),
+                    ),
+
+                    pad: [0.; 2],
+                    pad2: [0.; 2],
+                };
+
+                queue
+                    .write_buffer_with(
+                        &data.ui_uniform_buffer,
+                        0,
+                        wgpu::BufferSize::new(std::mem::size_of::<UiUniformRaw>() as u64).unwrap(),
+                    )
+                    .unwrap()
+                    .copy_from_slice(bytemuck::cast_slice(&[ui_raw]));
+
+                // queue.write_buffer(&data.ui_uniform_buffer, 0, bytemuck::cast_slice(&[ui_raw]));
+
+                data.size = ui_size.to_array();
+
+                data.text_buffer
+                    .set_metrics(font_system, Metrics::new(ui.font_size, ui.font_size));
+            });
     }
 
     fn insert_ui(
         &mut self,
         device: &wgpu::Device,
         font_system: &mut cosmic_text::FontSystem,
+        entity: Entity,
         ui: &Ui3d,
     ) {
-        log::trace!("Preparing new ui3d");
+        log::trace!("Inserting new ui3d Data");
 
-        let ui_uniform_buffer = tools::buffer(
-            device,
-            tools::BufferType::Uniform,
-            "Ui",
-            &[UiUniformRaw {
+        // let ui_uniform_buffer = tools::buffer(
+        //     device,
+        //     tools::BufferType::Uniform,
+        //     "Ui",
+        //     &[UiUniformRaw {
+        //         size: glam::vec2(1., 1.),
+        //         pad: [0.; 2],
+        //         menu_color: glam::vec4(1., 1., 1., 1.),
+        //         selection_color: glam::vec4(1., 0., 0., 1.),
+        //         selection_range_y: glam::vec2(0., 0.),
+        //         pad2: [0.; 2],
+        //     }],
+        // );
+
+        let ui_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Ui Uniform"),
+            contents: bytemuck::cast_slice(&[UiUniformRaw {
                 size: glam::vec2(1., 1.),
                 pad: [0.; 2],
                 menu_color: glam::vec4(1., 1., 1., 1.),
                 selection_color: glam::vec4(1., 0., 0., 1.),
                 selection_range_y: glam::vec2(0., 0.),
                 pad2: [0.; 2],
-            }],
-        );
+            }]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
 
         let ui_uniform_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Ui Bind Group"),
@@ -335,7 +403,7 @@ impl Ui3dRenderer {
         );
 
         self.instances.insert(
-            ui.id,
+            entity,
             Ui3dData {
                 ui_uniform_buffer,
                 ui_uniform_bind_group,
@@ -345,18 +413,6 @@ impl Ui3dRenderer {
                 text_buffer,
             },
         );
-    }
-
-    pub(crate) fn prep(&mut self) {
-        self.to_draw.iter().for_each(|id| {
-            self.previous.remove(id);
-        });
-
-        self.previous.iter().for_each(|id| {
-            self.instances.remove(id);
-        });
-
-        self.previous = self.to_draw.drain().collect::<HashSet<_>>();
     }
 
     pub(crate) fn render(
@@ -377,7 +433,7 @@ impl Ui3dRenderer {
             pass.draw(0..4, 0..1);
         });
 
-        // Draw Text
+        // // Draw Text
         pass.set_pipeline(&self.text_pipeline);
         pass.set_bind_group(1, text_atlas.bind_group(), &[]);
 

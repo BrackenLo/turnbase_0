@@ -1,36 +1,31 @@
 //====================================================================
 
-use std::sync::Arc;
-
 use common::Transform;
 use engine::StateInner;
-use renderer::texture_storage::LoadedTexture;
+use hecs::Entity;
+use renderer::pipelines::texture_pipeline::Sprite;
 
 //====================================================================
 
 pub struct Scenery {
-    floor_pos: Transform,
-    floor_tex: Arc<LoadedTexture>,
+    floor: Entity,
 }
 
 impl Scenery {
     pub fn new(state: &mut StateInner) -> Self {
-        Self {
-            floor_pos: Transform::from_rotation_translation(
+        let floor = state.world.spawn((
+            Transform::from_rotation_translation(
                 glam::Quat::from_rotation_x(90_f32.to_radians()),
                 glam::vec3(0., -20., 0.),
             ),
-            floor_tex: state.renderer.default_texture.get(),
-        }
-    }
+            Sprite {
+                texture: state.renderer.default_texture.get(),
+                size: glam::vec2(500., 500.),
+                color: [0.3, 0.3, 0.3, 1.],
+            },
+        ));
 
-    pub fn render(&self, state: &mut StateInner) {
-        state.renderer.draw_texture(
-            &self.floor_tex,
-            glam::vec2(500., 500.),
-            [0.3, 0.3, 0.3, 1.],
-            &self.floor_pos,
-        );
+        Self { floor }
     }
 }
 

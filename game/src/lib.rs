@@ -21,8 +21,10 @@ pub fn run() {
     }
     #[cfg(not(target_arch = "wasm32"))]
     env_logger::Builder::new()
-        .filter_module(env!("CARGO_PKG_NAME"), log::LevelFilter::Trace)
+        // .filter_module(env!("CARGO_PKG_NAME"), log::LevelFilter::Trace)
+        .filter_module("game", log::LevelFilter::Trace)
         .filter_module("engine", log::LevelFilter::Trace)
+        .filter_module("renderer", log::LevelFilter::Trace)
         .filter_module("wgpu", log::LevelFilter::Warn)
         .init();
 

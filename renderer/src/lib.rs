@@ -4,10 +4,8 @@ use std::sync::Arc;
 
 use camera::Camera;
 use common::Size;
-use pipelines::{
-    texture_pipeline::TextureRenderer,
-    ui3d_pipeline::{Ui3d, Ui3dRenderer},
-};
+use hecs::World;
+use pipelines::{texture_pipeline::TextureRenderer, ui3d_pipeline::Ui3dRenderer};
 use shared::SharedRenderResources;
 use text_shared::TextResources;
 use texture::Texture;
@@ -108,28 +106,33 @@ impl Renderer {
     }
 
     #[inline]
-    pub fn tick(&mut self) {
-        self.update();
-        self.render();
+    pub fn tick(&mut self, world: &mut World) {
+        self.update(world);
+        self.render(world);
+
+        self.core.device.poll(wgpu::Maintain::Wait);
+
+        self.text_res.text_atlas.post_render_trim();
     }
 
-    fn update(&mut self) {
+    fn update(&mut self, world: &mut World) {
         self.camera.update_camera(&self.core.queue);
 
         self.texture_pipeline
-            .prep(&self.core.device, &self.core.queue);
+            .prep(world, &self.core.device, &self.core.queue);
 
-        self.ui3d_pipeline.prep();
+        self.ui3d_pipeline
+            .prep_rotations(world, self.camera.camera.translation);
+
+        self.ui3d_pipeline.prep(
+            world,
+            &self.core.device,
+            &self.core.queue,
+            &mut self.text_res,
+        );
     }
 
-    fn render(&mut self) {
-        let mut encoder =
-            self.core
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Main command encoder"),
-                });
-
+    fn render(&mut self, _world: &mut World) {
         let (surface_texture, surface_view) = match self.core.surface.get_current_texture() {
             Ok(texture) => {
                 let view = texture
@@ -143,6 +146,22 @@ impl Renderer {
             }
         };
 
+        let mut encoder = self
+            .core
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+
+        self.render_inner(&mut encoder, &surface_view);
+
+        self.core.queue.submit(Some(encoder.finish()));
+        surface_texture.present();
+    }
+
+    fn render_inner(
+        &mut self,
+        encoder: &mut wgpu::CommandEncoder,
+        surface_view: &wgpu::TextureView,
+    ) {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Main Render Pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -153,6 +172,7 @@ impl Renderer {
                     store: wgpu::StoreOp::Store,
                 },
             })],
+
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                 view: &self.depth_texture.view,
                 depth_ops: Some(wgpu::Operations {
@@ -161,6 +181,7 @@ impl Renderer {
                 }),
                 stencil_ops: None,
             }),
+
             timestamp_writes: None,
             occlusion_query_set: None,
         });
@@ -174,37 +195,6 @@ impl Renderer {
             &self.text_res.text_atlas,
             self.camera.bind_group(),
         );
-
-        std::mem::drop(render_pass);
-        self.core.queue.submit(Some(encoder.finish()));
-        surface_texture.present();
-
-        self.text_res.text_atlas.post_render_trim();
-    }
-}
-
-impl Renderer {
-    #[inline]
-    pub fn draw_texture(
-        &mut self,
-        texture: &Arc<LoadedTexture>,
-        size: impl Into<glam::Vec2>,
-        color: [f32; 4],
-        transform: impl Into<glam::Mat4>,
-    ) {
-        self.texture_pipeline
-            .draw_texture(texture, size, color, transform);
-    }
-
-    #[inline]
-    pub fn create_ui(&mut self, options: Vec<String>, position: impl Into<glam::Vec3>) -> Ui3d {
-        self.ui3d_pipeline.create_ui(options, position)
-    }
-
-    #[inline]
-    pub fn draw_ui(&mut self, ui: &Ui3d) {
-        self.ui3d_pipeline
-            .draw_ui(&self.core.device, &self.core.queue, &mut self.text_res, ui);
     }
 }
 

@@ -23,6 +23,7 @@ struct Position {
 struct VertexIn {
     // Vertex
     @builtin(vertex_index) index: u32,
+
     // Instance
     @location(0) glyph_pos: vec2<f32>,
     @location(1) glyph_size: vec2<f32>,

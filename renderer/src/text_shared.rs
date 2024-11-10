@@ -305,6 +305,7 @@ impl Vertex for TextVertex {
 
 //====================================================================
 
+#[derive(Debug)]
 pub struct TextBuffer {
     pub vertex_buffer: wgpu::Buffer,
     pub vertex_count: u32,
@@ -376,7 +377,7 @@ impl TextBuffer {
 
 //====================================================================
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct TextBufferLine {
     hash: u64,
     length: usize,
