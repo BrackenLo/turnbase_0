@@ -5,7 +5,7 @@ use std::{
     f32::consts::{FRAC_PI_2, PI, TAU},
 };
 
-use actions::Action;
+use actions::ActionId;
 use common::Transform;
 use engine::StateInner;
 use glam::Vec3Swizzles;
@@ -37,16 +37,15 @@ impl CharacterManager {
         }
     }
 
-    pub fn spawn(&mut self, world: &mut World, name: &str) -> Entity {
-        // let id = self.current_id;
-        // self.current_id.0 += 1;
+    pub fn spawn(&mut self, world: &mut World, name: &str, actions: Vec<ActionId>) -> Entity {
+        assert!(actions.len() > 0);
 
         let character = world.spawn((
             Character {
                 name: name.into(),
                 player_controlled: true,
                 stats: CharacterStats { speed: 5 },
-                actions: Vec::new(),
+                actions,
                 front_facing: true,
             },
             Transform::default(),
@@ -57,35 +56,9 @@ impl CharacterManager {
             },
         ));
 
-        // let character = Character {
-        //     name: name.into(),
-        //     player_controlled: true,
-        //     stats: CharacterStats { speed: 5 },
-        //     actions: Vec::new(),
-        //     transform: Transform::default(),
-        //     front_facing: true,
-        //     texture: self.default_texture.get(),
-        // };
-
         self.characters.insert(character);
         character
     }
-
-    // #[inline]
-    // pub fn update(&mut self, state: &mut StateInner) {
-    //     self.characters
-    //         .values_mut()
-    //         .into_iter()
-    //         .for_each(|character| character.update(state));
-    // }
-
-    // #[inline]
-    // pub fn render(&self, state: &mut StateInner) {
-    //     self.characters
-    //         .values()
-    //         .into_iter()
-    //         .for_each(|character| character.render(state));
-    // }
 }
 
 //====================================================================
@@ -96,7 +69,7 @@ pub struct Character {
     pub name: String,
     pub player_controlled: bool,
     pub stats: CharacterStats,
-    pub actions: Vec<Action>,
+    pub actions: Vec<ActionId>,
 
     pub front_facing: bool,
 }
